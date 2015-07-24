@@ -865,11 +865,11 @@ type
       only needed if the transaction concern more than one database. }
     property DataBase: TUIBDataBase read FDataBase write SetDataBase;
     { If an error occur, this action is applied to the connected transaction. }
-    property OnError: TEndTransMode read FOnError write FOnError default etmRollback;
+    property OnError: TEndTransMode read FOnError write FOnError default etmStayIn;
     { If true all record are saved in memory. }
     property CachedFetch: boolean read FCachedFetch write FCachedFetch default True;
     { If true the blob data is fetched with the record. }
-    property FetchBlobs: boolean read FFetchBlobs write FFetchBlobs default False;
+    property FetchBlobs: boolean read FFetchBlobs write FFetchBlobs default True;
     { Use BufferChunks to get or set the number of records for which the query
       allocates buffer space at any time. When the query’s buffer is full,
       trying to fetch an additional record causes the dataset to reallocate
@@ -1279,7 +1279,7 @@ var
 begin
   if (FTransactions <> nil) then
     for i := 0 to FTransactions.Count - 1 do
-      TUIBTransaction(FTransactions.Items[i]).Close(etmDefault, True);
+      TUIBTransaction(FTransactions.Items[i]).Close(etmDefault, False);
 end;
 
 constructor TUIBDataBase.Create{$IFNDEF UIB_NO_COMPONENT}(AOwner: TComponent){$ENDIF};
@@ -2536,9 +2536,9 @@ begin
   FSQL         := TStringList.Create;
   TStringList(FSQL).OnChange := DoSQLChange;
   FCachedFetch := True;
-  FetchBlobs   := False;
+  FetchBlobs   := True;
   FQuickScript := False;
-  FOnError     := etmRollback;
+  FOnError     := etmStayIn;
   FParameter   := ParamsClass.Create(GetSystemCharacterset);
   FCursorName  := '';
   FBufferChunks := 1000;
@@ -4110,7 +4110,13 @@ begin
         ssUndoSavepoint:
           Transaction.SavepointRollback(Parser.Params.Values['SYMBOL']);
       {$ENDIF}
-        ssSelect, // perhaps a select statement execute a procedure ...
+        ssSelect: 
+          begin
+            FQuery.SQL.Text := trim(Parser.Statement);
+            FQuery.Open;
+            FQuery.Last;
+            FQuery.Close(etmStayIn);
+          end;
         ssInsertInto,
         ssDelete,
         ssUpdate:
