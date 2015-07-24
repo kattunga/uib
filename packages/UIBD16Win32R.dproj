@@ -9,7 +9,7 @@
 			<Config Condition="'$(Config)'==''">Release</Config>
 			<Base>True</Base>
 			<FrameworkType>VCL</FrameworkType>
-			<Platform Condition="'$(Platform)'==''">Win64</Platform>
+			<Platform Condition="'$(Platform)'==''">Win32</Platform>
 			<TargetedPlatforms>3</TargetedPlatforms>
 			<AppType>Package</AppType>
 		</PropertyGroup>
@@ -37,13 +37,13 @@
 			<Base>true</Base>
 		</PropertyGroup>
 		<PropertyGroup Condition="'$(Base)'!=''">
+			<DCC_DcuOutput>.\XE2\$(Platform)\$(Config)</DCC_DcuOutput>
 			<VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
 			<VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
 			<DCC_Namespace>Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
 			<VerInfo_Locale>1036</VerInfo_Locale>
 			<DCC_Description>UIB Components for D16</DCC_Description>
 			<DCC_ImageBase>00400000</DCC_ImageBase>
-			<DesignOnlyPackage>false</DesignOnlyPackage>
 			<RuntimeOnlyPackage>true</RuntimeOnlyPackage>
 			<DCC_DependencyCheckOutputName>C:\Users\Public\Documents\RAD Studio\7.0\Bpl\UIBD16Win32R.bpl</DCC_DependencyCheckOutputName>
 			<GenPackage>true</GenPackage>
@@ -149,10 +149,9 @@
 						<Source Name="MainSource">UIBD16Win32R.dpk</Source>
 					</Source>
 					<Excluded_Packages>
-						<Excluded_Packages Name="C:\Documents and Settings\All Users\Documents\RAD Studio\6.0\Bpl\UIBD12Win32D.bpl">Fichier C:\Documents and Settings\All Users\Documents\RAD Studio\6.0\Bpl\UIBD12Win32D.bpl non trouvé</Excluded_Packages>
-						<Excluded_Packages Name="C:\Documents and Settings\All Users\Documents\RAD Studio\6.0\Bpl\GrizzlyBaseD12.bpl">GrizzlyDev - Base</Excluded_Packages>
-						<Excluded_Packages Name="$(BDSBIN)\dcloffice2k120.bpl">Composants Microsoft Office 2000 Sample Automation Server Wrapper</Excluded_Packages>
-						<Excluded_Packages Name="$(BDSBIN)\dclofficexp120.bpl">Composants Microsoft Office XP Sample Automation Server Wrapper</Excluded_Packages>
+						<Excluded_Packages Name="C:\Users\Public\Documents\RAD Studio\9.0\Bpl\UIBD16Win32D.bpl">File C:\Users\Public\Documents\RAD Studio\9.0\Bpl\UIBD16Win32D.bpl not found</Excluded_Packages>
+						<Excluded_Packages Name="C:\Users\Public\Documents\RAD Studio\9.0\Bpl\ChristXE2.bpl">Objetos de christian</Excluded_Packages>
+						<Excluded_Packages Name="C:\Users\Public\Documents\RAD Studio\9.0\Bpl\kbmMWDesDXE2Ent.bpl">kbmMW Enterprise Edition - High performance n-tier - Delphi XE2 for Win32 - Designtime - www.Components4Developers.com</Excluded_Packages>
 					</Excluded_Packages>
 				</Delphi.Personality>
 				<Platforms>
