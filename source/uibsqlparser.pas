@@ -209,6 +209,7 @@ begin
   result := '';
   for i := FMarkerLine to FLine do
   begin
+    if i >= FStrings.Count then Break; 
     str := FStrings[i];
     if (FMarkerLine = FLine) then
       Result := copy(str, FMarkerPos +1, FCursor - PChar(FStr) - FMarkerPos ) else
