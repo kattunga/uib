@@ -151,7 +151,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-  {$IFDEF COMPILER21_UP}
+  {$IFDEF COMPILER19_UP}
     function GetFieldData(Field: TField; var Buffer: TValueBuffer): Boolean; overload; override;
     function GetFieldData(FieldNo: Integer; var Buffer: TValueBuffer): Boolean; overload;{$IFNDEF FPC} override; {$ENDIF}
   {$ELSE}
@@ -159,7 +159,7 @@ type
     function GetFieldData(FieldNo: Integer; Buffer: Pointer): Boolean; overload;{$IFNDEF FPC} override; {$ENDIF}
   {$ENDIF}
 {$IFNDEF FPC}
-  {$IFDEF COMPILER21_UP}
+  {$IFDEF COMPILER19_UP}
     function GetFieldData(Field: TField; var Buffer: TValueBuffer; NativeFormat: Boolean): Boolean; overload; override;
   {$ELSE}
     function GetFieldData(Field: TField; Buffer: Pointer; NativeFormat: Boolean): Boolean; overload; override;
@@ -858,7 +858,7 @@ begin
   end;
 end;
 
-{$IFDEF COMPILER21_UP}
+{$IFDEF COMPILER19_UP}
 function TUIBCustomDataSet.GetFieldData(FieldNo: Integer;
   var Buffer: TValueBuffer): Boolean;
 begin
@@ -872,7 +872,7 @@ begin
 end;
 {$ENDIF}
 
-{$IFDEF COMPILER21_UP}
+{$IFDEF COMPILER19_UP}
 function TUIBCustomDataSet.GetFieldData(Field: TField;
   var Buffer: TValueBuffer): Boolean;
 begin
@@ -1189,7 +1189,7 @@ end;
 {$ENDIF}
 
 {$IFNDEF FPC}
-{$IFDEF COMPILER21_UP}
+{$IFDEF COMPILER19_UP}
 function TUIBCustomDataSet.GetFieldData(Field: TField; var Buffer: TValueBuffer;
   NativeFormat: Boolean): Boolean;
 begin
