@@ -136,10 +136,10 @@ type
     property Transaction: TUIBTransaction read GetTransaction write SetTransaction;
     property Database: TUIBDataBase read GetDatabase write SetDatabase;
     property UniDirectional: boolean read  GetUniDirectional write SetUniDirectional default False;
-    property OnClose: TEndTransMode read FOnClose write SetOnClose default etmCommit;
-    property OnError: TEndTransMode read GetOnError write SetOnError default etmRollback;
+    property OnClose: TEndTransMode read FOnClose write SetOnClose default etmStayIn;
+    property OnError: TEndTransMode read GetOnError write SetOnError default etmStayIn;
     property SQL: TStrings read GetSQL write SetSQL;
-    property FetchBlobs: boolean read GetFetchBlobs write SetFetchBlobs default False;
+    property FetchBlobs: boolean read GetFetchBlobs write SetFetchBlobs default True;
     property Params: TSQLParams read GetParams;
     property RowsAffected: Cardinal read GetRowsAffected;
 
@@ -694,7 +694,7 @@ constructor TUIBCustomDataSet.Create(AOwner: TComponent);
 begin
   FStatement := TUIBQuery.Create(nil);
   FStatement.OnClose := OnStatementClose;
-  FOnClose := etmCommit;
+  FOnClose := etmStayIn; 
   inherited Create(AOwner);
   FIsLast := False;
   FIsFirst := False;
