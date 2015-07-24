@@ -115,6 +115,7 @@ type
     FData: Pointer;
     FDependents: TMetaNodeArray;
     FDependedOn: TMetaNodeArray;
+    FDataStr: string;  // c_pradelli, para uso interno
     function GetItems(const ClassIndex, Index: Integer): TMetaNode;
     procedure AddClass(ClassID: TMetaNodeClass);
     procedure CheckTransaction(Transaction: TUIBTransaction);
@@ -153,6 +154,7 @@ type
     property Nodes[const Index: Integer]: TNodeItem read GetNodes;
     property Parent: TMetaNode read FOwner;
     property Data: Pointer read FData write FData;
+    property DataStr: string read FDataStr write FDataStr;  // c_pradelli, para uso interno
     property DependentCount: Integer read GetDependentCount;
     property Dependent[const Index: Integer]: TMetaNode read GetDependent;
     property DependedOnCount: Integer read GetDependedOnCount;
@@ -452,6 +454,7 @@ type
 
   TMetaTable = class(TMetaBaseTable)
   private
+    FType: string; // c_pradelli
     function GetFields(const Index: Integer): TMetaTableField;
     function GetFieldsCount: Integer;
     procedure LoadFromDataBase(QNames, QFields, QCharset, QPrimary,
@@ -646,6 +649,9 @@ type
     property GrantsCount: Integer read GetRoleGrantsCount;
   end;
 
+  // c_pradelli, para soportar filtros
+  TMetaDataBaseOnAddObject = procedure(Sender: TObject; const NodeClass, NodeName: string; var Accept: boolean) of object;
+
   TMetaDataBase = class(TMetaNode)
   private
     FOIDDatabases: TOIDDatabases;
@@ -660,6 +666,7 @@ type
     FSortedTables: TList;
     FSortedViews: TList;
     FIdentifiers: TAvlTree;
+    FOnAddObject: TMetaDataBaseOnAddObject;  // c_pradelli
 
     procedure SortTablesByForeignKeys;
     procedure SortViewsByDependencies;
@@ -750,6 +757,8 @@ type
 
     property SysInfos: Boolean read FSysInfos write FSysInfos;
     property DefaultCharset: TCharacterSet read FDefaultCharset;
+
+    property OnAddObject: TMetaDataBaseOnAddObject read FOnAddObject write FOnAddObject; // c_pradelli
   end;
 
   { Used to store temporary grantees }
@@ -953,7 +962,7 @@ const
 
   QRYTables =
     'select ' +
-    '  REL.RDB$RELATION_NAME ' +
+    '  REL.RDB$RELATION_NAME, REL.RDB$RELATION_TYPE ' +  // c_pradelli, agregue REL.RDB$RELATION_TYPE
     'from ' +
     '  RDB$RELATIONS REL ' +
     'where ' +
@@ -1629,6 +1638,12 @@ procedure TMetaGenerator.LoadFromDataBase(Transaction: TUIBTransaction;
 var
   Query: TUIBStatement;
 begin
+  // c_pradelli, no me sirve el valor del generador, trae problemas con las comparaciones
+  FName := MetaQuote(Name);
+  FValue := 0;
+  Exit;
+  //
+
   CheckTransaction(Transaction);
   Query := TUIBStatement.Create{$IFNDEF UIB_NO_COMPONENT}(nil){$ENDIF};
   Query.Transaction := Transaction;
@@ -2019,6 +2034,7 @@ var
 begin
   // Fields
   FName := MetaQuote(Trim(QNames.Fields.AsString[0]));
+  FType := QNames.Fields.AsString[1]; // c_pradelli
 
   if OIDTableField in OIDs then
   begin
@@ -2165,11 +2181,13 @@ end;
 procedure TMetaTable.LoadFromStream(Stream: TStream);
 begin
   ReadString(Stream, FName);
+  ReadString(Stream, FType); // c_pradelli
 end;
 
 procedure TMetaTable.SaveToStream(Stream: TStream);
 begin
   WriteString(Stream, FName);
+  WriteString(Stream, FType); // c_pradelli
   inherited SaveToStream(Stream);
 end;
 
@@ -2238,7 +2256,10 @@ procedure TMetaTable.SaveToDDLNode(Stream: TStringStream; options: TDDLOptions);
 var
   I: Integer;
 begin
-  Stream.WriteString(Format('CREATE TABLE %s (', [Name]));
+  if (FType = '5') or (FType = '4') then                                      // c_pradelli, manejo de tipos de tables
+    Stream.WriteString(Format('CREATE GLOBAL TEMPORARY TABLE %s (', [Name]))
+  else
+    Stream.WriteString(Format('CREATE TABLE %s (', [Name]));
   for I := 0 to FieldsCount - 1 do
   begin
     Stream.WriteString(NewLine + '   ');
@@ -2246,7 +2267,12 @@ begin
     if I <> FieldsCount - 1 then
       Stream.WriteString(',');
   end;
-  Stream.WriteString(NewLine + ');');
+  if FType = '5' then                                                         // c_pradelli, manejo de tipos de tables
+    Stream.WriteString(NewLine + ') ON COMMIT DELETE ROWS;')
+  else if FType = '4' then
+    Stream.WriteString(NewLine + ') ON COMMIT PRESERVE ROWS;')
+  else
+    Stream.WriteString(NewLine + ');');
 end;
 
 class function TMetaTable.NodeClass: string;
@@ -2596,6 +2622,8 @@ var
   QIndex, QForeign, QCheck, QTrigger, QArrayDim: TUIBStatement;
   QDependencies: TUIBStatement;
   QDefaultCharset, QGrants, QFieldGrants: TUIBStatement;
+  Accept: boolean; // c_pradelli
+
   procedure Configure(var Q: TUIBStatement; const Qry: string;
     CachedFetch: Boolean = False);
   begin
@@ -2660,8 +2688,13 @@ begin
       QNames.Open;
       while not QNames.Eof do
       begin
-        with TMetaGenerator.Create(Self, Ord(OIDGenerator)) do
-          LoadFromDataBase(Transaction, Trim(QNames.Fields.AsString[0]));
+        // c_pradelli
+        Accept := True;
+        if Assigned(FOnAddObject) then
+          FOnAddObject(Self, TMetaGenerator.NodeClass, Trim(QNames.Fields.AsString[0]), Accept);
+        if Accept then
+          with TMetaGenerator.Create(Self, Ord(OIDGenerator)) do
+            LoadFromDataBase(Transaction, Trim(QNames.Fields.AsString[0]));
         QNames.Next;
       end;
     end;
@@ -2677,10 +2710,15 @@ begin
       QNames.Open;
       while not QNames.Eof do
       begin
-        with TMetaTable.Create(Self, Ord(OIDTable)) do
-          LoadFromDataBase(QNames, QFields, QCharset, QPrimary,
-            QIndex, QCheck, QTrigger, QArrayDim, QGrants, QFieldGrants,
-            FOIDTables, FDefaultCharset);
+        // c_pradelli
+        Accept := True;
+        if Assigned(FOnAddObject) then
+          FOnAddObject(Self, TMetaTable.NodeClass, Trim(QNames.Fields.AsString[0]), Accept);
+        if Accept then
+          with TMetaTable.Create(Self, Ord(OIDTable)) do
+            LoadFromDataBase(QNames, QFields, QCharset, QPrimary,
+              QIndex, QCheck, QTrigger, QArrayDim, QGrants, QFieldGrants,
+              FOIDTables, FDefaultCharset);
         QNames.Next;
       end;
 
@@ -2751,25 +2789,42 @@ begin
       QNames.Open;
       while not QNames.Eof do
       begin
-        with TMetaView.Create(Self, Ord(OIDView)) do
-          LoadFromDataBase(QNames, QFields, QTrigger, QCharset, QArrayDim,
-            QGrants, QFieldGrants, FOIDViews, FDefaultCharset);
+        // c_pradelli
+        Accept := True;
+        if Assigned(FOnAddObject) then
+          FOnAddObject(Self, TMetaView.NodeClass, Trim(QNames.Fields.AsString[0]), Accept);
+        if Accept then
+          with TMetaView.Create(Self, Ord(OIDView)) do
+            LoadFromDataBase(QNames, QFields, QTrigger, QCharset, QArrayDim,
+              QGrants, QFieldGrants, FOIDViews, FDefaultCharset);
         QNames.Next;
       end;
     end;
 
+    // c_pradelli, agregue mas informacion de errores por characterset
     // PROCEDURE
+    Str := '';                            // c_pradelli
     if OIDProcedure in FOIDDatabases then
-    begin
+    try                                   // c_pradelli
       FNodeItems[Ord(OIDProcedure)].Childs.Clear;
       QNames.SQL.Text := QRYProcedures;
       QFields.SQL.Text := QRYProcFields;
       QNames.Open;
       while not QNames.Eof do
       begin
-        with TMetaProcedure.Create(Self, Ord(OIDProcedure)) do
-          LoadFromQuery(QNames, QFields, QCharset, QArrayDim, QGrants, FOIDProcedures, FDefaultCharset);
+        Str := QNames.Fields.AsString[0]; // c_pradelli
+        Accept := True;
+        if Assigned(FOnAddObject) then
+          FOnAddObject(Self, TMetaProcedure.NodeClass, Trim(Str), Accept);
+        if Accept then
+          with TMetaProcedure.Create(Self, Ord(OIDProcedure)) do
+            LoadFromQuery(QNames, QFields, QCharset, QArrayDim, QGrants, FOIDProcedures, FDefaultCharset);
         QNames.Next;
+      end;
+    except                                // c_pradelli
+      on E: Exception do begin
+        E.Message := E.Message+#13#10#13#10+'En procedimiento siguiente alfabeticamente a '+Str;
+        raise;
       end;
     end;
 
@@ -2781,8 +2836,13 @@ begin
       QNames.Open;
       while not QNames.Eof do
       begin
-        with TMetaException.Create(Self, Ord(OIDException)) do
-          LoadFromQuery(QNames);
+        // c_pradelli
+        Accept := True;
+        if Assigned(FOnAddObject) then
+          FOnAddObject(Self, TMetaException.NodeClass, Trim(QNames.Fields.AsString[0]), Accept);
+        if Accept then
+          with TMetaException.Create(Self, Ord(OIDException)) do
+            LoadFromQuery(QNames);
         QNames.Next;
       end;
     end;
@@ -2796,8 +2856,13 @@ begin
       QNames.Open;
       while not QNames.Eof do
       begin
-        with TMetaUDF.Create(Self, Ord(OIDUDF)) do
-          LoadFromQuery(QNames, QFields, QCharset, QArrayDim, FOIDUDFs, FDefaultCharset);
+        // c_pradelli
+        Accept := True;
+        if Assigned(FOnAddObject) then
+          FOnAddObject(Self, TMetaUDF.NodeClass, Trim(QNames.Fields.AsString[0]), Accept);
+        if Accept then
+          with TMetaUDF.Create(Self, Ord(OIDUDF)) do
+            LoadFromQuery(QNames, QFields, QCharset, QArrayDim, FOIDUDFs, FDefaultCharset);
         QNames.Next;
       end;
     end;
@@ -3836,7 +3901,8 @@ var
   Count: Smallint;
   Suf: TTriggerSuffix;
 begin
-  Stream.WriteString(Format('CREATE TRIGGER %s FOR %s%s',
+//  Stream.WriteString(Format('CREATE TRIGGER %s FOR %s%s',   c_pradelli
+  Stream.WriteString(Format({$IFDEF FB15_UP}'CREATE OR ALTER'{$ELSE}'CREATE'{$ENDIF}+' TRIGGER %s FOR %s%s',
     [Name, TMetaNode(FOwner).Name, NewLine]));
   if not FActive then
     Stream.WriteString('INACTIVE ');
@@ -3851,7 +3917,8 @@ begin
         Stream.WriteString(' OR ');
       Stream.WriteString(TriggerSuffixTypes[Suf]);
     end;
-  Stream.WriteString(Format(' POSITION %d%s%s;', [FPosition, NewLine, FSource]));
+  Stream.WriteString(Format(' POSITION %d%s%s', [FPosition, NewLine, FSource]));    // c_pradelli, no agregar ;
+//  Stream.WriteString(Format(' POSITION %d%s%s;', [FPosition, NewLine, FSource]));
 end;
 
 procedure TMetaTrigger.SaveToAlterToInactiveDDL(Stream: TStringStream);
@@ -4035,7 +4102,7 @@ begin
   end;
   Stream.WriteString(NewLine + ')' + NewLine + 'AS' + NewLine);
   Stream.WriteString(Source + NewLine);
-  Stream.WriteString(';');
+//  Stream.WriteString(';');  c_pradelli, no agrego terminadores
 end;
 
 procedure TMetaView.SaveToStream(Stream: TStream);
@@ -4289,10 +4356,12 @@ begin
   if SameText(Copy(S,1,4),'decl') then
     Insert('  ',S,1);
 
-  InternalSaveToDDL(Stream, 'CREATE', options);
+//  InternalSaveToDDL(Stream, 'CREATE', options); c_pradelli
+  InternalSaveToDDL(Stream, {$IFDEF FB15_UP}'CREATE OR ALTER'{$ELSE}'CREATE'{$ENDIF}, options); // c_pradelli
   Stream.WriteString(NewLine + 'AS ');
   Stream.WriteString(S);
-  Stream.WriteString(';');
+//  if not AnsiEndsStr(';',s) then          c_pradelli, no agrego terminadores
+//    Stream.WriteString(';');
 end;
 
 procedure TMetaProcedure.SaveToStream(Stream: TStream);
@@ -4383,7 +4452,8 @@ end;
 
 procedure TMetaException.SaveToDDLNode(Stream: TStringStream; options: TDDLOptions);
 begin
-  Stream.WriteString(Format('CREATE EXCEPTION %s %s;', [Name, QuotedStr(FMessage)]));
+//  Stream.WriteString(Format('CREATE EXCEPTION %s %s;', [Name, QuotedStr(FMessage)])); c_pradelli
+  Stream.WriteString(Format({$IFDEF FB20_UP}'CREATE OR ALTER'{$ELSE}'CREATE'{$ENDIF}+' EXCEPTION %s %s;', [Name, QuotedStr(FMessage)]));
 end;
 
 procedure TMetaException.SaveToStream(Stream: TStream);
