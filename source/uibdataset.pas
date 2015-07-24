@@ -733,6 +733,8 @@ begin
     {$IFNDEF FPC}
       count := 1;
       TmpName := AliasName[i];
+      if TmpName = '' then     
+        TmpName := '_FIELD_'+IntTostr(i);
       while TDefCollection(Collection).IndexOf(TmpName) >= 0 do
       begin
         TmpName := TmpName + inttostr(count);
@@ -746,7 +748,7 @@ begin
       Size := 0;
     {$ENDIF}
       FieldNo := i;
-      Required := not IsNullable[i];
+      Required := not IsNullable[i] and (SqlName[i] <> '');
       case FieldType[i] of
         uftNumeric:
           begin
