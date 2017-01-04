@@ -1,0 +1,49 @@
+package UIBD19Win32R;
+
+{$R *.res}
+{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO ON}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS ON}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION OFF}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO ON}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES ON}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DEFINE DEBUG}
+{$ENDIF IMPLICITBUILDING}
+{$DESCRIPTION 'UIB Components for XE2 D16'}
+{$RUNONLY}
+{$IMPLICITBUILD OFF}
+
+requires
+  rtl,
+  dbrtl;
+
+contains
+  uib in '..\source\uib.pas',
+  uibase in '..\source\uibase.pas',
+  uibconst in '..\source\uibconst.pas',
+  uiberror in '..\source\uiberror.pas',
+  uiblib in '..\source\uiblib.pas',
+  uibmetadata in '..\source\uibmetadata.pas',
+  uibsqlparser in '..\source\uibsqlparser.pas',
+  uibdataset in '..\source\uibdataset.pas',
+  uibkeywords in '..\source\uibkeywords.pas',
+  uibavl in '..\source\uibavl.pas',
+  uibdescriptor in '..\source\uibdescriptor.pas';
+
+end.

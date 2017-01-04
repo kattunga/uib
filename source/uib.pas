@@ -13,6 +13,7 @@
 (* Contributor:                                                                 *)
 (*     Olivier Guilbaud <oguilb@free.fr>                                        *)
 (*     Pierre Yager <pierre.y@gmail.com>                                        *)
+(*     Jean-Marc BOTTURA <jmbottura@visiativ.com>                               *)
 (*                                                                              *)
 (********************************************************************************)
 
@@ -959,6 +960,7 @@ type
     procedure EndService; virtual;
     function CreateParam(code: AnsiChar; const Value: RawByteString): RawByteString; overload;
     function CreateParam(code: AnsiChar; Value: Integer): RawByteString; overload;
+    function CreateParam(code: AnsiChar; Value: ShortInt): RawByteString; overload;
   public
     constructor Create{$IFNDEF UIB_NO_COMPONENT}(AOwner: TComponent); override{$ENDIF};
     destructor Destroy; override;
@@ -1028,7 +1030,7 @@ type
     property PageSize: Cardinal read FPageSize write FPageSize default 0;
 {$IFDEF FB25_UP}
     property FixMetadataCharset: TCharacterSet read FFixMetadataCharset write FFixMetadataCharset;
-    property FixDataCharset: TCharacterSet read FFixDataCharset write FFixMetadataCharset;
+    property FixDataCharset: TCharacterSet read FFixDataCharset write FFixDataCharset;
 {$ENDIF}
   end;
 
@@ -1198,18 +1200,38 @@ type
     destructor Destroy; override;
   end;
 
+  TUIBStats = class(TUIBService)
+  private
+    FDatabase: string;
+    FOnVerbose: TVerboseEvent;
+  protected
+    function CreateStartSPB: RawByteString; virtual;
+  public
+    procedure Run;
+  published
+    property Database: string read FDatabase write FDatabase;
+    property OnVerbose: TVerboseEvent read FOnVerbose write FOnVerbose;
+  end;
+
   TShutdownMode = (smForced, smDenyTransaction, smDenyAttachment);
+{$IFDEF FB25_UP}
+  TShutdownOpt = (smNormal, smMulti, smSingle, smFull);
+{$ENDIF}
 
   TUIBConfig = class(TUIBService)
   private
     FDatabaseName: TFileName;
   public
-    procedure ShutdownDatabase(Options: TShutdownMode; Wait: Integer);
+    procedure ShutdownDatabase(Mode: TShutdownMode; Wait: Integer);
+{$IFDEF FB25_UP}
+    procedure ShutdownDatabaseEx(Mode: TShutdownMode; Wait: Integer; Option: TShutdownOpt);
+{$ENDIF}
     procedure SetSweepInterval(Value: Integer);
     procedure SetDBSqlDialect(Value: Integer);
     procedure SetPageBuffers(Value: Integer);
     procedure ActivateShadow;
     procedure BringDatabaseOnline;
+
     procedure SetReserveSpace(Value: Boolean);
     procedure SetAsyncMode(Value: Boolean);
     procedure SetReadOnly(Value: Boolean);
@@ -3075,6 +3097,9 @@ begin
           {$IFDEF IB7_UP}
             blr_boolean_dtype : Params.AddFieldType(Trim(AsString[1]), uftBoolean);
           {$ENDIF}
+          {$IFDEF FB30_UP}
+            blr_bool      : Params.AddFieldType(Trim(AsString[1]), uftBoolean);
+          {$ENDIF}
           else
             // shouldn't occur but ...
             raise Exception.Create(EUIB_UNEXPECTEDERROR);
@@ -3553,6 +3578,12 @@ begin
   result := code + PAnsiChar(@Value)[0] + PAnsiChar(@Value)[1] + PAnsiChar(@Value)[2] + PAnsiChar(@Value)[3];
 end;
 
+function TUIBService.CreateParam(code: AnsiChar;
+  Value: ShortInt): RawByteString;
+begin
+  result := code + AnsiChar(Value);
+end;
+
 { TUIBBackupRestore }
 
 constructor TUIBBackupRestore.Create{$IFNDEF UIB_NO_COMPONENT}(AOwner: TComponent){$ENDIF};
@@ -4003,7 +4034,7 @@ var
     try
       if FQuery.Params.ParamCount > 0 then
         FQuery.Prepare(true) else
-        FQuery.ExecSQL;
+        FQuery.Execute;
     except
       on E: Exception do
       begin
@@ -4622,6 +4653,55 @@ begin
   end;
 end;
 
+{ TUIBStats }
+
+function TUIBStats.CreateStartSPB: RawByteString;
+var
+  Len: Word;
+  Param: byte;
+begin
+  result := isc_action_svc_db_stats;
+
+  // DB Name
+  Result := Result + isc_spb_dbname;
+  Len := Length(FDatabase);
+  Result := Result + PAnsiChar(@Len)[0] + PAnsiChar(@Len)[1];
+  Result := Result + AnsiString(FDatabase);
+
+  // only -header option is handled for now
+  Param := isc_spb_sts_hdr_pages;
+
+  if (Param <> 0) then
+    Result := Result + isc_spb_options + AnsiChar(Param) + #0#0#0;
+end;
+
+procedure TUIBStats.Run;
+var
+  Buffer: RawByteString;
+  Len: Word;
+begin
+  BeginService;
+  try
+    FLibrary.ServiceStart(FHandle, CreateStartSPB);
+    SetLength(Buffer, 1024);
+    while true do
+    begin
+      FLibrary.ServiceQuery(FHandle, '', isc_info_svc_line, Buffer);
+      if (Buffer[1] <> isc_info_svc_line) then
+        raise Exception.Create(EUIB_UNEXPECTEDERROR);
+      Len := PWord(@Buffer[2])^;
+      if (len > 0)  then
+      begin
+        if Assigned(FOnVerbose) then
+          FOnVerbose(self, string(copy(Buffer, 4, len)));
+      end else
+        Break;
+    end;
+  finally
+    EndService;
+  end;
+end;
+
 { TUIBConfig }
 
 procedure TUIBConfig.ActivateShadow;
@@ -4729,7 +4809,7 @@ begin
   end;
 end;
 
-procedure TUIBConfig.ShutdownDatabase(Options: TShutdownMode;
+procedure TUIBConfig.ShutdownDatabase(Mode: TShutdownMode;
   Wait: Integer);
 const
   ShutdownMode: array[TShutdownMode] of AnsiChar =
@@ -4739,11 +4819,32 @@ begin
   try
     FLibrary.ServiceStart(FHandle, isc_action_svc_properties +
       CreateParam(isc_spb_dbname, AnsiString(FDatabaseName)) +
-      CreateParam(ShutdownMode[Options], Wait));
+      CreateParam(ShutdownMode[Mode], Wait));
   finally
     EndService;
   end;
 end;
+
+{$IFDEF FB25_UP}
+procedure TUIBConfig.ShutdownDatabaseEx(Mode: TShutdownMode; Wait: Integer;
+  Option: TShutdownOpt);
+const
+  ShutdownModes: array[TShutdownMode] of AnsiChar =
+    (isc_spb_prp_force_shutdown, isc_spb_prp_transactions_shutdown, isc_spb_prp_attachments_shutdown);
+  ShutdownOption: array[TShutdownOpt] of Shortint =
+    (isc_spb_prp_sm_normal, isc_spb_prp_sm_multi, isc_spb_prp_sm_single, isc_spb_prp_sm_full);
+begin
+  BeginService;
+  try
+    FLibrary.ServiceStart(FHandle, isc_action_svc_properties +
+      CreateParam(isc_spb_dbname, AnsiString(FDatabaseName)) +
+      CreateParam(isc_spb_prp_shutdown_mode, ShutdownOption[Option]) +
+      CreateParam(ShutdownModes[Mode], Wait));
+  finally
+    EndService;
+  end;
+end;
+{$ENDIF}
 
 { TUIBServerInfo }
 

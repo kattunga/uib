@@ -151,7 +151,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-  {$IFDEF COMPILER19_UP}
+  {$IFDEF COMPILER21_UP}
     function GetFieldData(Field: TField; var Buffer: TValueBuffer): Boolean; overload; override;
     function GetFieldData(FieldNo: Integer; var Buffer: TValueBuffer): Boolean; overload;{$IFNDEF FPC} override; {$ENDIF}
   {$ELSE}
@@ -159,7 +159,7 @@ type
     function GetFieldData(FieldNo: Integer; Buffer: Pointer): Boolean; overload;{$IFNDEF FPC} override; {$ENDIF}
   {$ENDIF}
 {$IFNDEF FPC}
-  {$IFDEF COMPILER19_UP}
+  {$IFDEF COMPILER21_UP}
     function GetFieldData(Field: TField; var Buffer: TValueBuffer; NativeFormat: Boolean): Boolean; overload; override;
   {$ELSE}
     function GetFieldData(Field: TField; Buffer: Pointer; NativeFormat: Boolean): Boolean; overload; override;
@@ -452,9 +452,17 @@ begin
     {$IFDEF IB7_UP}
       uftBoolean:
         {$IFDEF FPC}
-          Boolean(Buffer^) := PSmallInt(sqldata)^ = ISC_TRUE;
+          Boolean(Buffer^) := PSmallInt(sqldata)^ <> ISC_FALSE;
         {$ELSE}
-          WordBool(Buffer^) := PSmallInt(sqldata)^ = ISC_TRUE;
+          WordBool(Buffer^) := PSmallInt(sqldata)^ <> ISC_FALSE;
+        {$ENDIF}
+    {$ENDIF}
+    {$IFDEF FB30_UP}
+      uftBoolean:
+        {$IFDEF FPC}
+          Boolean(Buffer^) := PAnsiChar(sqldata)^ <> FB_FALSE;
+        {$ELSE}
+          WordBool(Buffer^) := PAnsiChar(sqldata)^ <> FB_FALSE;
         {$ENDIF}
     {$ENDIF}
     else
@@ -838,7 +846,7 @@ begin
         uftDate : DataType := ftDate;
         uftTime : DataType := ftTime;
         uftInt64: DataType := ftLargeint;
-      {$IFDEF IB7_UP}
+      {$IFDEF UIB_HAVE_BOOLEAN}
         uftBoolean: DataType := ftBoolean;
       {$ENDIF}
       else
@@ -860,7 +868,7 @@ begin
   end;
 end;
 
-{$IFDEF COMPILER19_UP}
+{$IFDEF COMPILER21_UP}
 function TUIBCustomDataSet.GetFieldData(FieldNo: Integer;
   var Buffer: TValueBuffer): Boolean;
 begin
@@ -874,7 +882,7 @@ begin
 end;
 {$ENDIF}
 
-{$IFDEF COMPILER19_UP}
+{$IFDEF COMPILER21_UP}
 function TUIBCustomDataSet.GetFieldData(Field: TField;
   var Buffer: TValueBuffer): Boolean;
 begin
@@ -1191,7 +1199,7 @@ end;
 {$ENDIF}
 
 {$IFNDEF FPC}
-{$IFDEF COMPILER19_UP}
+{$IFDEF COMPILER21_UP}
 function TUIBCustomDataSet.GetFieldData(Field: TField; var Buffer: TValueBuffer;
   NativeFormat: Boolean): Boolean;
 begin
